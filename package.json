@@ -1,6 +1,6 @@
 {
   "name": "id-vault",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "A private home for identity details and documents.",
   "productName": "ID Vault",
   "main": "out/main/index.js",
