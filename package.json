@@ -1,0 +1,61 @@
+{
+  "name": "id-vault",
+  "version": "1.0.1",
+  "description": "A private home for identity details and documents.",
+  "productName": "ID Vault",
+  "main": "out/main/index.js",
+  "author": "Geordan Gesink",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "config": {
+    "forge": "./forge.config.cjs"
+  },
+  "scripts": {
+    "start": "npm run dev",
+    "dev": "npm run build:native && electron-vite dev",
+    "build": "npm run build:native && npm run build:app",
+    "build:app": "npm run typecheck && electron-vite build",
+    "build:native": "node scripts/build-native.mjs",
+    "preview": "electron-vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "package": "electron-forge package",
+    "make": "electron-forge make",
+    "make:release": "node scripts/make-release.cjs",
+    "build:icons": "node scripts/build-icons.mjs",
+    "pack": "npm run package",
+    "dist": "npm run make"
+  },
+  "dependencies": {
+    "electron-squirrel-startup": "^1.0.1",
+    "jszip": "^3.10.1",
+    "lucide-react": "^1.25.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  },
+  "devDependencies": {
+    "@electron-forge/cli": "^7.11.2",
+    "@electron-forge/maker-deb": "^7.11.2",
+    "@electron-forge/maker-dmg": "^7.11.2",
+    "@electron-forge/maker-rpm": "^7.11.2",
+    "@electron-forge/maker-squirrel": "^7.11.2",
+    "@electron-forge/maker-zip": "^7.11.2",
+    "@electron/node-gyp": "^10.2.0-electron.2",
+    "@electron/notarize": "^3.1.1",
+    "@electron/osx-sign": "^2.6.0",
+    "@types/electron-squirrel-startup": "^1.0.2",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.2.0",
+    "electron": "^43.1.1",
+    "electron-vite": "^5.0.0",
+    "sharp": "^0.35.3",
+    "typescript": "^6.0.3",
+    "vite": "^7.3.6",
+    "vitest": "^4.1.10"
+  }
+}

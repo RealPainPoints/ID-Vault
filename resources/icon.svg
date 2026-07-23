@@ -1,0 +1,124 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="background" x1="162" y1="104" x2="856" y2="920" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#438475"/>
+      <stop offset=".42" stop-color="#286557"/>
+      <stop offset="1" stop-color="#123C33"/>
+    </linearGradient>
+    <linearGradient id="rim" x1="170" y1="104" x2="858" y2="914" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#C6E9DF" stop-opacity=".72"/>
+      <stop offset=".34" stop-color="#7EB6A7" stop-opacity=".32"/>
+      <stop offset=".68" stop-color="#173F36" stop-opacity=".08"/>
+      <stop offset="1" stop-color="#041D18" stop-opacity=".72"/>
+    </linearGradient>
+    <linearGradient id="card" x1="318" y1="218" x2="718" y2="806" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset=".48" stop-color="#F5F8F4"/>
+      <stop offset="1" stop-color="#DCE7E1"/>
+    </linearGradient>
+    <linearGradient id="cardEdge" x1="294" y1="208" x2="748" y2="818" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset=".35" stop-color="#FFFFFF" stop-opacity=".74"/>
+      <stop offset="1" stop-color="#A7BDB4" stop-opacity=".58"/>
+    </linearGradient>
+    <linearGradient id="face" x1="118" y1="76" x2="392" y2="456" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#347968"/>
+      <stop offset=".48" stop-color="#246554"/>
+      <stop offset="1" stop-color="#15473D"/>
+    </linearGradient>
+    <linearGradient id="edge" x1="108" y1="68" x2="402" y2="448" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#D7F2E8"/>
+      <stop offset=".22" stop-color="#78B9A7"/>
+      <stop offset=".58" stop-color="#2C6E5C"/>
+      <stop offset="1" stop-color="#0B332B"/>
+    </linearGradient>
+    <linearGradient id="check" x1="174" y1="184" x2="338" y2="326" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#DCEAE4"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientTransform="translate(282 196) rotate(46) scale(566 566)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#BCE8DA" stop-opacity=".24"/>
+      <stop offset="1" stop-color="#BCE8DA" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="backgroundShadow" x="8" y="18" width="1008" height="1008" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="24" stdDeviation="24" flood-color="#061E19" flood-opacity=".34"/>
+    </filter>
+    <filter id="cardShadow" x="192" y="156" width="640" height="742" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="28" stdDeviation="34" flood-color="#082A22" flood-opacity=".38"/>
+    </filter>
+  </defs>
+  <g filter="url(#backgroundShadow)">
+    <rect x="52" y="52" width="920" height="920" rx="220" fill="url(#background)"/>
+    <rect x="52" y="52" width="920" height="920" rx="220" fill="url(#glow)"/>
+    <rect x="70" y="70" width="884" height="884" rx="204" fill="none" stroke="url(#rim)" stroke-width="7"/>
+    <path
+      d="M168 100h480c155 0 276 116 276 268"
+      fill="none"
+      stroke="#E4FFF6"
+      stroke-opacity=".2"
+      stroke-width="8"
+      stroke-linecap="round"
+    />
+  </g>
+  <g filter="url(#cardShadow)">
+    <rect x="248" y="202" width="528" height="620" rx="142" fill="#B9CBC3" opacity=".46" transform="translate(0 13)"/>
+    <rect x="248" y="202" width="528" height="620" rx="142" fill="url(#card)" stroke="url(#cardEdge)" stroke-width="9"/>
+    <path
+      d="M320 226h236c91 0 170 51 199 126"
+      fill="none"
+      stroke="#FFFFFF"
+      stroke-opacity=".86"
+      stroke-width="8"
+      stroke-linecap="round"
+    />
+  </g>
+  <g transform="translate(302 282) scale(.82)">
+    <path
+      d="M256 48 426 110v133c0 124-72 207-170 247C158 450 86 367 86 243V110l170-62Z"
+      fill="#0C382F"
+      opacity=".52"
+      transform="translate(0 11)"
+    />
+    <path
+      d="M256 48 426 110v133c0 124-72 207-170 247C158 450 86 367 86 243V110l170-62Z"
+      fill="url(#face)"
+      stroke="url(#edge)"
+      stroke-width="12"
+      stroke-linejoin="round"
+    />
+    <path
+      d="M256 65 105 120v123c0 68 23 124 62 165"
+      fill="none"
+      stroke="#ECFFF8"
+      stroke-opacity=".44"
+      stroke-width="7"
+      stroke-linecap="round"
+    />
+    <path
+      d="m163 259 63 62 123-136"
+      fill="none"
+      stroke="#0B3B31"
+      stroke-opacity=".34"
+      stroke-width="48"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      transform="translate(0 9)"
+    />
+    <path
+      d="m163 259 63 62 123-136"
+      fill="none"
+      stroke="url(#check)"
+      stroke-width="43"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+    <path
+      d="m172 252 53 52"
+      fill="none"
+      stroke="#FFFFFF"
+      stroke-opacity=".62"
+      stroke-width="7"
+      stroke-linecap="round"
+    />
+  </g>
+</svg>
