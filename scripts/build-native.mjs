@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { chmodSync, cpSync, mkdirSync, rmSync } from 'node:fs'
+import { chmodSync, cpSync, mkdirSync, readFileSync, rmSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -12,6 +12,8 @@ if (process.platform === 'darwin') {
   const extensionRoot = join(outputRoot, 'IDVaultWidget.appex')
   const bridgeExecutable = join(outputRoot, 'IDVaultWidgetBridge')
   const architectures = ['arm64', 'x86_64']
+  const { version } = JSON.parse(readFileSync(join(projectRoot, 'package.json'), 'utf8'))
+  const buildNumber = process.env.ID_VAULT_BUILD_NUMBER || '2'
 
   rmSync(outputRoot, { recursive: true, force: true })
   mkdirSync(buildRoot, { recursive: true })
@@ -31,6 +33,8 @@ if (process.platform === 'darwin') {
     `OBJROOT=${join(xcodeBuildRoot, 'obj')}`,
     `SYMROOT=${xcodeBuildRoot}`,
     `DSTROOT=${join(xcodeBuildRoot, 'dst')}`,
+    `MARKETING_VERSION=${version}`,
+    `CURRENT_PROJECT_VERSION=${buildNumber}`,
     'ARCHS=arm64 x86_64',
     'ONLY_ACTIVE_ARCH=NO',
     'CODE_SIGNING_ALLOWED=NO',

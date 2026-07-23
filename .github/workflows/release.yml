@@ -1,0 +1,250 @@
+name: Build
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  gate:
+    name: Gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Build renderer and main process
+        run: npm run build:app
+
+  package:
+    name: Package macOS ${{ matrix.arch }}
+    needs: gate
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            runner: macos-15
+            executable_arch: arm64
+          - arch: x64
+            runner: macos-15-intel
+            executable_arch: x86_64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Validate tag version
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          package_version="$(node -p "require('./package.json').version")"
+          test "${GITHUB_REF_NAME}" = "v${package_version}" || {
+            echo "Tag ${GITHUB_REF_NAME} does not match package version ${package_version}."
+            exit 1
+          }
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Set build number
+        shell: bash
+        run: echo "ID_VAULT_BUILD_NUMBER=$((GITHUB_RUN_NUMBER + 1000))" >> "$GITHUB_ENV"
+
+      - name: Validate release secrets
+        shell: bash
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          MAC_CODESIGN_CERT_P12_BASE64: ${{ secrets.MAC_CODESIGN_CERT_P12_BASE64 }}
+          MAC_CODESIGN_CERT_PASSWORD: ${{ secrets.MAC_CODESIGN_CERT_PASSWORD }}
+        run: |
+          for secret_name in \
+            APPLE_ID \
+            APPLE_PASSWORD \
+            APPLE_TEAM_ID \
+            MAC_CODESIGN_CERT_P12_BASE64 \
+            MAC_CODESIGN_CERT_PASSWORD
+          do
+            test -n "${!secret_name}" || {
+              echo "Missing GitHub Actions secret: ${secret_name}"
+              exit 1
+            }
+          done
+
+      - name: Import signing certificate
+        shell: bash
+        env:
+          MAC_CODESIGN_CERT_P12_BASE64: ${{ secrets.MAC_CODESIGN_CERT_P12_BASE64 }}
+          MAC_CODESIGN_CERT_PASSWORD: ${{ secrets.MAC_CODESIGN_CERT_PASSWORD }}
+        run: |
+          certificate_path="$RUNNER_TEMP/id-vault-developer-id.p12"
+          keychain_path="$RUNNER_TEMP/id-vault-signing.keychain-db"
+          keychain_password="$(openssl rand -hex 24)"
+
+          printf '%s' "$MAC_CODESIGN_CERT_P12_BASE64" | base64 -D > "$certificate_path"
+          security create-keychain -p "$keychain_password" "$keychain_path"
+          security set-keychain-settings -lut 21600 "$keychain_path"
+          security unlock-keychain -p "$keychain_password" "$keychain_path"
+          security import "$certificate_path" \
+            -P "$MAC_CODESIGN_CERT_PASSWORD" \
+            -A \
+            -t cert \
+            -f pkcs12 \
+            -k "$keychain_path"
+          security set-key-partition-list \
+            -S apple-tool:,apple:,codesign: \
+            -s \
+            -k "$keychain_password" \
+            "$keychain_path"
+          security list-keychains \
+            -d user \
+            -s "$keychain_path" "$HOME/Library/Keychains/login.keychain-db"
+          security default-keychain -s "$keychain_path"
+          security find-identity -v -p codesigning "$keychain_path"
+
+          echo "ID_VAULT_KEYCHAIN_PATH=$keychain_path" >> "$GITHUB_ENV"
+          echo "ID_VAULT_CERTIFICATE_PATH=$certificate_path" >> "$GITHUB_ENV"
+
+      - name: Package, sign, and notarize
+        shell: bash
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          MAC_SIGN_IDENTITY: "Developer ID Application: Geordan Gesink (99564YDV39)"
+        run: npm run make:release -- --platform=darwin --arch="${{ matrix.arch }}"
+
+      - name: Verify signature, notarization, and architecture
+        shell: bash
+        env:
+          RELEASE_ARCH: ${{ matrix.arch }}
+          EXECUTABLE_ARCH: ${{ matrix.executable_arch }}
+        run: |
+          app_path="release/ID Vault-darwin-${RELEASE_ARCH}/ID Vault.app"
+          host_executable="$app_path/Contents/MacOS/ID Vault"
+          widget_path="$app_path/Contents/PlugIns/IDVaultWidget.appex"
+          widget_executable="$widget_path/Contents/MacOS/IDVaultWidget"
+          bridge_executable="$app_path/Contents/MacOS/IDVaultWidgetBridge"
+          package_version="$(node -p "require('./package.json').version")"
+
+          test -d "$app_path"
+          test -d "$widget_path"
+          test -x "$bridge_executable"
+
+          codesign --verify --deep --strict --verbose=2 "$app_path"
+          codesign --verify --strict --verbose=2 "$widget_path"
+          codesign --verify --strict --verbose=2 "$bridge_executable"
+          xcrun stapler validate "$app_path"
+          spctl --assess --type execute --verbose=4 "$app_path"
+
+          test "$(lipo -archs "$host_executable")" = "$EXECUTABLE_ARCH"
+          lipo -verify_arch arm64 x86_64 "$widget_executable"
+          lipo -verify_arch arm64 x86_64 "$bridge_executable"
+
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app_path/Contents/Info.plist")" = "$package_version"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$app_path/Contents/Info.plist")" = "$ID_VAULT_BUILD_NUMBER"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$widget_path/Contents/Info.plist")" = "$package_version"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$widget_path/Contents/Info.plist")" = "$ID_VAULT_BUILD_NUMBER"
+
+          dmg_path="$(find release/make -maxdepth 1 -type f -name '*.dmg' -print -quit)"
+          zip_path="$(find "release/make/zip/darwin/${RELEASE_ARCH}" -maxdepth 1 -type f -name '*.zip' -print -quit)"
+          test -n "$dmg_path"
+          test -n "$zip_path"
+          hdiutil verify "$dmg_path"
+          unzip -t "$zip_path"
+
+          mkdir -p artifacts
+          cp "$dmg_path" "artifacts/ID-Vault-mac-${RELEASE_ARCH}.dmg"
+          cp "$zip_path" "artifacts/ID-Vault-mac-${RELEASE_ARCH}.zip"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: id-vault-${{ github.ref_name }}-${{ matrix.arch }}
+          path: artifacts/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Remove temporary signing keychain
+        if: always()
+        shell: bash
+        run: |
+          if test -n "${ID_VAULT_KEYCHAIN_PATH:-}" && test -f "$ID_VAULT_KEYCHAIN_PATH"; then
+            security delete-keychain "$ID_VAULT_KEYCHAIN_PATH"
+          fi
+          if test -n "${ID_VAULT_CERTIFICATE_PATH:-}"; then
+            rm -f "$ID_VAULT_CERTIFICATE_PATH"
+          fi
+
+  release:
+    name: Create draft release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download packaged artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create checksums
+        shell: bash
+        run: |
+          test -f artifacts/ID-Vault-mac-arm64.dmg
+          test -f artifacts/ID-Vault-mac-arm64.zip
+          test -f artifacts/ID-Vault-mac-x64.dmg
+          test -f artifacts/ID-Vault-mac-x64.zip
+          cd artifacts
+          sha256sum \
+            ID-Vault-mac-arm64.dmg \
+            ID-Vault-mac-arm64.zip \
+            ID-Vault-mac-x64.dmg \
+            ID-Vault-mac-x64.zip \
+            > SHA256SUMS.txt
+
+      - name: Create draft GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          prerelease: false
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          overwrite_files: true
+          files: |
+            artifacts/ID-Vault-mac-arm64.dmg
+            artifacts/ID-Vault-mac-arm64.zip
+            artifacts/ID-Vault-mac-x64.dmg
+            artifacts/ID-Vault-mac-x64.zip
+            artifacts/SHA256SUMS.txt

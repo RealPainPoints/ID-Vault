@@ -19,7 +19,7 @@ module.exports = {
   packagerConfig: {
     name: 'ID Vault',
     executableName: 'ID Vault',
-    buildVersion: '2',
+    buildVersion: process.env.ID_VAULT_BUILD_NUMBER || '2',
     appBundleId: 'com.idvault.desktop',
     appCategoryType: 'public.app-category.productivity',
     icon,
