@@ -169,8 +169,8 @@ jobs:
           spctl --assess --type execute --verbose=4 "$app_path"
 
           test "$(lipo -archs "$host_executable")" = "$EXECUTABLE_ARCH"
-          lipo -verify_arch arm64 x86_64 "$widget_executable"
-          lipo -verify_arch arm64 x86_64 "$bridge_executable"
+          lipo "$widget_executable" -verify_arch arm64 x86_64
+          lipo "$bridge_executable" -verify_arch arm64 x86_64
 
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app_path/Contents/Info.plist")" = "$package_version"
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$app_path/Contents/Info.plist")" = "$ID_VAULT_BUILD_NUMBER"
