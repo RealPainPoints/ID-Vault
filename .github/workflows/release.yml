@@ -208,7 +208,7 @@ jobs:
           fi
 
   release:
-    name: Create draft release
+    name: Publish release
     if: startsWith(github.ref, 'refs/tags/v')
     needs: package
     runs-on: ubuntu-latest
@@ -234,11 +234,12 @@ jobs:
             ID-Vault-mac-x64.zip \
             > SHA256SUMS.txt
 
-      - name: Create draft GitHub release
+      - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          draft: true
+          draft: false
           prerelease: false
+          make_latest: true
           generate_release_notes: true
           fail_on_unmatched_files: true
           overwrite_files: true
