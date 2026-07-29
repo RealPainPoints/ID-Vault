@@ -27,6 +27,7 @@ import type {
   ProfileInput,
   VaultState
 } from '../shared/types'
+import { parseDeepLink } from './deep-link'
 import { VaultService } from './vault-service'
 import { SystemWidgetService } from './system-widget'
 
@@ -35,8 +36,12 @@ let widgetWindow: BrowserWindow | null = null
 let tray: Tray | null = null
 let vault: VaultService
 let isQuitting = false
+let appInitialized = false
 let vaultOperations: Promise<void> = Promise.resolve()
 let pendingDeepLink: string | null = null
+let activationTimer: ReturnType<typeof setTimeout> | null = null
+let activationBeforeReady = false
+let suppressNextActivationUntil = 0
 
 const isMac = process.platform === 'darwin'
 const systemWidget = new SystemWidgetService()
@@ -126,44 +131,66 @@ function broadcast(state: VaultState): void {
 
 function publishState(state: VaultState): void {
   broadcast(state)
-  void systemWidget.publish(state).catch((error: unknown) => {
-    console.error('Unable to update the macOS widget:', error)
-  })
+  void systemWidget
+    .publish(state, (detail) => vault.createWidgetCopyToken(detail))
+    .catch((error: unknown) => {
+      console.error('Unable to update the macOS widget:', error)
+    })
 }
 
-function targetFromDeepLink(value: string): NavigationTarget | undefined {
-  try {
-    const url = new URL(value)
-    if (url.protocol !== `${protocolScheme}:` || url.hostname !== 'open') return undefined
-    const view = url.searchParams.get('view')
-    const page = view && ['overview', 'details', 'documents', 'settings'].includes(view)
-      ? (view as Page)
-      : 'overview'
-    const id = url.searchParams.get('id')?.toLowerCase()
-    const itemId =
-      (page === 'details' || page === 'documents') &&
-      id &&
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(id)
-        ? id
-        : undefined
-    return { page, itemId }
-  } catch {
-    return undefined
+async function copySystemWidgetDetail(detailId: string, copyToken: string): Promise<boolean> {
+  const detail = vault.resolveWidgetCopy(detailId, copyToken)
+  if (!detail) return false
+  const activationAlreadyReceived = activationBeforeReady || activationTimer !== null
+  activationBeforeReady = false
+  if (activationTimer) {
+    clearTimeout(activationTimer)
+    activationTimer = null
   }
+  suppressNextActivationUntil = activationAlreadyReceived ? 0 : Date.now() + 500
+  if (isMac) await systemWidget.copyText(detail.value.slice(0, 1000))
+  else clipboard.writeText(detail.value.slice(0, 1000))
+  if (isMac && !mainWindow?.isVisible()) app.hide()
+  return true
 }
 
 function handleDeepLink(value: string): void {
-  const target = targetFromDeepLink(value)
-  if (!target) return
+  const action = parseDeepLink(value, protocolScheme)
+  if (!action) return
   if (!app.isReady() || !vault) {
     pendingDeepLink = value
     return
   }
-  showMain(target)
+  if (action.type === 'copy-detail') {
+    void copySystemWidgetDetail(action.detailId, action.copyToken)
+      .then((copied) => {
+        if (!copied) showMain({ page: 'details', itemId: action.detailId })
+      })
+      .catch(() => showMain({ page: 'details', itemId: action.detailId }))
+    return
+  }
+  showMain(action.target)
 }
 
 function deepLinkFromArguments(argumentsList: string[]): string | undefined {
   return argumentsList.find((argument) => argument.startsWith(`${protocolScheme}://`))
+}
+
+function handleActivation(): void {
+  if (!appInitialized) {
+    activationBeforeReady = true
+    return
+  }
+  if (Date.now() < suppressNextActivationUntil) {
+    suppressNextActivationUntil = 0
+    return
+  }
+  suppressNextActivationUntil = 0
+  if (activationTimer) clearTimeout(activationTimer)
+  activationTimer = setTimeout(() => {
+    activationTimer = null
+    showMain()
+  }, 150)
 }
 
 function secureWindow(window: BrowserWindow): void {
@@ -490,7 +517,11 @@ function registerIpc(): void {
       importedDocuments: imported.documents
     }
   })
-  registerHandler(IPC.copyText, (_event, value: string) => clipboard.writeText(value.slice(0, 1000)))
+  registerHandler(IPC.copyText, (_event, value: string) => {
+    const copyValue = value.slice(0, 1000)
+    if (isMac) return systemWidget.copyText(copyValue)
+    clipboard.writeText(copyValue)
+  })
   registerHandler(IPC.showWidget, showWidget)
   registerHandler(IPC.hideWidget, () => widgetWindow?.hide())
   registerHandler(IPC.showMain, (_event, page?: Page) => showMain(page))
@@ -508,6 +539,7 @@ if (!app.requestSingleInstanceLock()) {
     if (deepLink) handleDeepLink(deepLink)
     else showMain()
   })
+  app.on('activate', handleActivation)
 
   app
     .whenReady()
@@ -515,21 +547,29 @@ if (!app.requestSingleInstanceLock()) {
       app.setAsDefaultProtocolClient(protocolScheme)
       vault = new VaultService(publishState)
       await vault.initialize()
-      await systemWidget.publish(vault.get()).catch((error: unknown) => {
-        console.error('Unable to initialize the macOS widget:', error)
-      })
+      await systemWidget
+        .publish(vault.get(), (detail) => vault.createWidgetCopyToken(detail))
+        .catch((error: unknown) => {
+          console.error('Unable to initialize the macOS widget:', error)
+        })
       registerIpc()
       createApplicationMenu()
       createTray()
-      createMainWindow()
       const startupDeepLink = pendingDeepLink ?? deepLinkFromArguments(process.argv)
+      const startupAction = startupDeepLink
+        ? parseDeepLink(startupDeepLink, protocolScheme)
+        : undefined
       pendingDeepLink = null
+      if (startupAction?.type !== 'copy-detail') {
+        activationBeforeReady = false
+        createMainWindow()
+      }
       if (startupDeepLink) handleDeepLink(startupDeepLink)
+      appInitialized = true
       globalShortcut.register('CommandOrControl+Shift+Space', toggleWidget)
       nativeTheme.on('updated', () => {
         if (vault.get().preferences.colorMode === 'system') syncWindowChrome()
       })
-      app.on('activate', () => showMain())
     })
     .catch((error: unknown) => {
       const message = error instanceof Error ? error.message : String(error)
@@ -549,6 +589,9 @@ if (!app.requestSingleInstanceLock()) {
       })
   })
 
-  app.on('will-quit', () => globalShortcut.unregisterAll())
+  app.on('will-quit', () => {
+    if (activationTimer) clearTimeout(activationTimer)
+    globalShortcut.unregisterAll()
+  })
   app.on('window-all-closed', () => undefined)
 }

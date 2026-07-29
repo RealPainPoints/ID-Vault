@@ -14,6 +14,10 @@ import {
 import { basename, dirname, extname, join } from 'node:path'
 import { createArchive, readArchive } from './archive'
 import { decryptLocal, encryptLocal } from './crypto'
+import {
+  createWidgetCopyCapability,
+  resolveWidgetCopyDetail
+} from './widget-copy-capability'
 import type {
   Detail,
   DetailInput,
@@ -193,6 +197,17 @@ export class VaultService {
 
   get(): VaultState {
     return structuredClone(this.state)
+  }
+
+  createWidgetCopyToken(detail: Detail): string {
+    return createWidgetCopyCapability(this.key, detail)
+  }
+
+  resolveWidgetCopy(
+    detailId: string,
+    copyToken: string
+  ): Pick<Detail, 'label' | 'value'> | undefined {
+    return resolveWidgetCopyDetail(this.key, this.state, detailId, copyToken)
   }
 
   async saveDetail(input: DetailInput): Promise<VaultState> {

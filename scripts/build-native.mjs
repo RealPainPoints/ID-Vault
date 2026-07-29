@@ -56,6 +56,8 @@ if (process.platform === 'darwin') {
       '-framework',
       'Foundation',
       '-framework',
+      'AppKit',
+      '-framework',
       'WidgetKit'
     ]
     args.push(join(sourceRoot, 'WidgetBridge.swift'), '-o', output)

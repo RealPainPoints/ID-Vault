@@ -186,7 +186,7 @@ export default function SettingsPage({
             <div className="setting-row">
               <span>
                 <strong>Share selected items with the macOS widget</strong>
-                <small>Only labels, masked values, document titles, and types are shared.</small>
+                <small>Masked values stay in the widget; click one to copy it securely.</small>
               </span>
               <Toggle
                 checked={vault.preferences.systemWidgetEnabled}

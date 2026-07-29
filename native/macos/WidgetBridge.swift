@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import WidgetKit
 
@@ -5,6 +6,7 @@ private let appGroupIdentifier = "99564YDV39.com.idvault.shared"
 private let widgetKind = "com.idvault.desktop.quick-access"
 private let snapshotName = "widget-snapshot.json"
 private let maximumSnapshotSize = 1_048_576
+private let maximumCopySize = 4_096
 
 private struct RevisionEnvelope: Decodable {
     let version: Int
@@ -12,6 +14,26 @@ private struct RevisionEnvelope: Decodable {
 }
 
 let data = FileHandle.standardInput.readDataToEndOfFile()
+
+if CommandLine.arguments.dropFirst().first == "--copy" {
+    guard
+        !data.isEmpty,
+        data.count <= maximumCopySize,
+        let value = String(data: data, encoding: .utf8),
+        !value.isEmpty
+    else {
+        FileHandle.standardError.write(Data("Invalid clipboard value.\n".utf8))
+        exit(2)
+    }
+    let pasteboard = NSPasteboard.general
+    pasteboard.prepareForNewContents(with: .currentHostOnly)
+    guard pasteboard.setString(value, forType: .string) else {
+        FileHandle.standardError.write(Data("The value could not be copied.\n".utf8))
+        exit(1)
+    }
+    exit(0)
+}
+
 guard !data.isEmpty, data.count <= maximumSnapshotSize else {
     FileHandle.standardError.write(Data("Invalid widget snapshot.\n".utf8))
     exit(2)

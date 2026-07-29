@@ -209,7 +209,7 @@ export function DetailEditor({
                 <div>
                   <span>
                     <strong>Show in the macOS widget</strong>
-                    <small>Only the label and a masked value are shared.</small>
+                    <small>Shows a masked value you can click to copy.</small>
                   </span>
                   <Toggle
                     checked={visibleInSystemWidget}

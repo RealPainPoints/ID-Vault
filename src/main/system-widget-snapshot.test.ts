@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest'
 import type { VaultState } from '../shared/types'
 import { createSystemWidgetSnapshot } from './system-widget-snapshot'
 
+const copyToken = 'A'.repeat(43)
+const createCopyToken = (): string => copyToken
+
 function state(): VaultState {
   const date = '2026-07-21T10:00:00.000Z'
   return {
@@ -63,14 +66,15 @@ function state(): VaultState {
 
 describe('system widget snapshot', () => {
   it('publishes only opted-in masked content', () => {
-    const snapshot = createSystemWidgetSnapshot(state())
+    const snapshot = createSystemWidgetSnapshot(state(), createCopyToken)
     const serialized = JSON.stringify(snapshot)
 
     expect(snapshot.details).toEqual([
       {
         id: '54f3b28e-6a43-47c9-b705-cb9c8a1f5871',
         label: 'Tax ID',
-        value: '•••••6789'
+        value: '•••••6789',
+        copyToken
       }
     ])
     expect(snapshot.documents).toHaveLength(1)
@@ -85,7 +89,7 @@ describe('system widget snapshot', () => {
   it('publishes an empty snapshot when disabled', () => {
     const vault = state()
     vault.preferences.systemWidgetEnabled = false
-    const snapshot = createSystemWidgetSnapshot(vault)
+    const snapshot = createSystemWidgetSnapshot(vault, createCopyToken)
 
     expect(snapshot.details).toEqual([])
     expect(snapshot.documents).toEqual([])
@@ -97,8 +101,8 @@ describe('system widget snapshot', () => {
     second.profile.legalName = 'Different private name'
     second.updatedAt = '2026-07-21T11:00:00.000Z'
 
-    expect(createSystemWidgetSnapshot(first).revision).toBe(
-      createSystemWidgetSnapshot(second).revision
+    expect(createSystemWidgetSnapshot(first, createCopyToken).revision).toBe(
+      createSystemWidgetSnapshot(second, createCopyToken).revision
     )
   })
 })

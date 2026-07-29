@@ -1,15 +1,15 @@
 import { app } from 'electron'
 import { spawn } from 'node:child_process'
 import { dirname, join } from 'node:path'
-import type { VaultState } from '../shared/types'
+import type { Detail, VaultState } from '../shared/types'
 import { createSystemWidgetSnapshot } from './system-widget-snapshot'
 
 export class SystemWidgetService {
   private queue: Promise<void> = Promise.resolve()
 
-  publish(state: VaultState): Promise<void> {
+  publish(state: VaultState, createCopyToken: (detail: Detail) => string): Promise<void> {
     if (process.platform !== 'darwin') return Promise.resolve()
-    const payload = Buffer.from(JSON.stringify(createSystemWidgetSnapshot(state)))
+    const payload = Buffer.from(JSON.stringify(createSystemWidgetSnapshot(state, createCopyToken)))
     const task = this.queue.then(() => this.invokeBridge(payload))
     this.queue = task.catch(() => undefined)
     return task
@@ -19,15 +19,20 @@ export class SystemWidgetService {
     return this.queue
   }
 
+  copyText(value: string): Promise<void> {
+    if (process.platform !== 'darwin') return Promise.resolve()
+    return this.invokeBridge(Buffer.from(value, 'utf8'), ['--copy'])
+  }
+
   private bridgePath(): string {
     return app.isPackaged
       ? join(dirname(process.execPath), 'IDVaultWidgetBridge')
       : join(app.getAppPath(), 'native', 'dist', 'IDVaultWidgetBridge')
   }
 
-  private invokeBridge(payload: Buffer): Promise<void> {
+  private invokeBridge(payload: Buffer, argumentsList: string[] = []): Promise<void> {
     return new Promise((resolve, reject) => {
-      const child = spawn(this.bridgePath(), [], {
+      const child = spawn(this.bridgePath(), argumentsList, {
         stdio: ['pipe', 'ignore', 'pipe'],
         windowsHide: true
       })

@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import type { VaultState } from '../shared/types'
+import type { Detail, VaultState } from '../shared/types'
 
 export type SystemWidgetSnapshot = {
   version: 1
@@ -9,6 +9,7 @@ export type SystemWidgetSnapshot = {
     id: string
     label: string
     value: string
+    copyToken: string
   }>
   documents: Array<{
     id: string
@@ -23,7 +24,10 @@ function maskValue(value: string): string {
   return `${compact.slice(0, -4).replace(/[A-Za-z0-9]/g, '•')}${compact.slice(-4)}`
 }
 
-export function createSystemWidgetSnapshot(state: VaultState): SystemWidgetSnapshot {
+export function createSystemWidgetSnapshot(
+  state: VaultState,
+  createCopyToken: (detail: Detail) => string
+): SystemWidgetSnapshot {
   const enabled = state.preferences.systemWidgetEnabled
   const details = enabled
     ? state.details
@@ -32,7 +36,8 @@ export function createSystemWidgetSnapshot(state: VaultState): SystemWidgetSnaps
         .map((detail) => ({
           id: detail.id,
           label: detail.label,
-          value: maskValue(detail.value)
+          value: maskValue(detail.value),
+          copyToken: createCopyToken(detail)
         }))
     : []
   const documents = enabled

@@ -10,6 +10,31 @@ private struct DetailSnapshot: Codable, Identifiable {
     let id: String
     let label: String
     let value: String
+    let copyToken: String?
+
+    var canCopy: Bool {
+        !(copyToken?.isEmpty ?? true)
+    }
+
+    var copyURL: URL {
+        var components = URLComponents()
+        components.scheme = "idvault"
+        components.host = "open"
+        if let copyToken, canCopy {
+            components.queryItems = [
+                URLQueryItem(name: "view", value: "details"),
+                URLQueryItem(name: "id", value: id),
+                URLQueryItem(name: "action", value: "copy"),
+                URLQueryItem(name: "token", value: copyToken)
+            ]
+        } else {
+            components.queryItems = [
+                URLQueryItem(name: "view", value: "details"),
+                URLQueryItem(name: "id", value: id)
+            ]
+        }
+        return components.url ?? URL(string: "idvault://open?view=details")!
+    }
 }
 
 private struct DocumentSnapshot: Codable, Identifiable {
@@ -39,9 +64,9 @@ private struct VaultSnapshot: Codable {
         revision: "preview",
         updatedAt: "",
         details: [
-            DetailSnapshot(id: "tax", label: "Tax ID", value: "•• ••• •• 901"),
-            DetailSnapshot(id: "vat", label: "VAT ID", value: "•••••••6789"),
-            DetailSnapshot(id: "passport", label: "Passport", value: "•••••0T47")
+            DetailSnapshot(id: "tax", label: "Tax ID", value: "•• ••• •• 901", copyToken: nil),
+            DetailSnapshot(id: "vat", label: "VAT ID", value: "•••••••6789", copyToken: nil),
+            DetailSnapshot(id: "passport", label: "Passport", value: "•••••0T47", copyToken: nil)
         ],
         documents: [
             DocumentSnapshot(id: "passport", title: "Passport", kind: "passport", expiresAt: nil),
@@ -253,7 +278,7 @@ private struct VaultWidgetView: View {
                 sectionLabel("QUICK DETAILS")
             }
             ForEach(entry.snapshot.details.prefix(detailLimit)) { detail in
-                Link(destination: URL(string: "idvault://open?view=details&id=\(detail.id)")!) {
+                Link(destination: detail.copyURL) {
                     HStack(spacing: 8) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(detail.label)
@@ -268,14 +293,24 @@ private struct VaultWidgetView: View {
                                 .privacySensitive()
                         }
                         Spacer(minLength: 4)
-                        if family != .systemSmall {
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 8, weight: .bold))
-                                .foregroundStyle(.white.opacity(0.24))
-                        }
+                        Image(systemName: detail.canCopy ? "doc.on.doc" : "chevron.right")
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(
+                                detail.canCopy
+                                    ? Color(red: 0.61, green: 0.84, blue: 0.76).opacity(0.72)
+                                    : .white.opacity(0.24)
+                            )
                     }
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(
+                    detail.canCopy ? "Copy \(detail.label)" : "Open \(detail.label)"
+                )
+                .accessibilityHint(
+                    detail.canCopy
+                        ? "Copies the full value from ID Vault"
+                        : "Opens this detail in ID Vault"
+                )
             }
             if entry.snapshot.details.isEmpty {
                 Text("Choose details in ID Vault")
@@ -358,7 +393,7 @@ private struct IDVaultSystemWidget: Widget {
             VaultWidgetView(entry: entry)
         }
         .configurationDisplayName("ID Vault Quick Access")
-        .description("See masked identity details and open stored documents.")
+        .description("Copy identity details and open stored documents.")
         .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
         .contentMarginsDisabled()
     }
